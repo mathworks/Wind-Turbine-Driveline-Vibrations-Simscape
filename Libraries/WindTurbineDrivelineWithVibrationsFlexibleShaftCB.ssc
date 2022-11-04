@@ -1,0 +1,476 @@
+component WindTurbineDrivelineWithVibrationsFlexibleShaftCB
+% Craig-Bampton Flexible Shaft
+%
+% Models a Craig-Bampton reduced model for a flexible shaft transverse deflections.
+% All units must be in SI.
+% Matrices must be square for all system DOF's.
+% There must be 1-5 supports with speed-dependent bearings.
+% 
+% The Craig-Bampton method has static primary modes and inner modes.
+% The static modes have translational nodes that interface with the supports.
+
+% Copyright 2022 The MathWorks, Inc.
+
+nodes
+    B = foundation.mechanical.rotational.rotational; % B:left
+    F = foundation.mechanical.rotational.rotational; % F:right   
+end
+
+variables
+    t= {0, 'N*m'};
+end
+branches
+    t : B.t -> F.t
+end
+
+parameters
+    M= eye(12,12);
+    normM= eye(12,12);
+    G= eye(12,12);
+    K= {eye(12,12), '1/s^2'};
+    alpha= {.01, '1/s'};
+    beta= {.001, 's'};
+    
+    ForceMagnitude= zeros(12,4);
+    
+    num_primary_nodes= 4;
+
+    % Nominal value scaling
+    eta_nominal_value= 1;    % Mode displacements nominal value (units of 1)
+    etaDer_nominal_value= 1; % Mode velocities nominal value (units of 1/s)
+
+    support_node= [1 3]; % node index with supports
+    
+    bearing_speed= {[5 10 15], 'rad/s'};;
+    K_supportB1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N/m'}       % B [Kxx Kxy Kyx Kyy]
+    D_supportB1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N*s/m'}     % B [Dxx Dxy Dyx Dyy]
+    Krot_supportB1= {ones(1,2), 'N*m/rad'}   % B [Ktt Kpp]
+    Drot_supportB1= {ones(1,2), 'N*m*s/rad'} % B [Dtt Dpp]
+
+    K_supportF1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N/m'}       % F [Kxx Kxy Kyx Kyy]
+    D_supportF1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N*s/m'}     % F [Dxx Dxy Dyx Dyy]
+    Krot_supportF1= {ones(1,2), 'N*m/rad'}   % F [Ktt Kpp]
+    Drot_supportF1= {ones(1,2), 'N*m*s/rad'} % F [Dtt Dpp]
+
+    K_supportI1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N/m'}       % I1 [Kxx Kxy Kyx Kyy]
+    D_supportI1   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N*s/m'}     % I1 [Dxx Dxy Dyx Dyy]
+    Krot_supportI1= {ones(1,2), 'N*m/rad'}   % I1 [Ktt Kpp]
+    Drot_supportI1= {ones(1,2), 'N*m*s/rad'} % I1 [Dtt Dpp]
+
+    K_supportI2   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N/m'}       % I2 [Kxx Kxy Kyx Kyy]
+    D_supportI2   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N*s/m'}     % I2 [Dxx Dxy Dyx Dyy]
+    Krot_supportI2= {ones(1,2), 'N*m/rad'}   % I2 [Ktt Kpp]
+    Drot_supportI2= {ones(1,2), 'N*m*s/rad'} % I2 [Dtt Dpp]
+
+    K_supportI3   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N/m'}       % I3 [Kxx Kxy Kyx Kyy]
+    D_supportI3   = {[1 0 0 2; 10 0 0 20; 100 0 0 200], 'N*s/m'}     % I3 [Dxx Dxy Dyx Dyy]
+    Krot_supportI3= {ones(1,2), 'N*m/rad'}   % I3 [Ktt Kpp]
+    Drot_supportI3= {ones(1,2), 'N*m*s/rad'} % I3 [Dtt Dpp]
+end
+
+annotations
+    UILayout = [...
+        UIGroup('Shaft', M, normM, G, K, alpha, beta, ForceMagnitude, num_primary_nodes,...
+            eta_nominal_value, etaDer_nominal_value)
+        UIGroup('Supports', support_node, bearing_speed, K_supportB1, D_supportB1, Krot_supportB1, Drot_supportB1,...
+            K_supportI1, D_supportI1, Krot_supportI1, Drot_supportI1,...
+            K_supportI2, D_supportI2, Krot_supportI2, Drot_supportI2,...
+            K_supportI3, D_supportI3, Krot_supportI3, Drot_supportI3,...
+            K_supportF1, D_supportF1, Krot_supportF1, Drot_supportF1)]
+
+    Icon= 'WindTurbineDrivelineWithVibrationsIcon.jpg'
+end
+
+equations
+    assert(num_primary_nodes >= max(support_node), 'All points of support and forcing should be primary nodes');
+end
+
+% Derived Parameters
+parameters (Access = private, ExternalAccess = none)
+    num_DOF= size(M,1);
+    num_supports= length(support_node);
+
+    inds= 1:num_DOF;
+    support_ind_= [4*support_node-3; 4*support_node-2; 4*support_node-1; 4*support_node];
+    support_ind= support_ind_(:);
+
+    [~, free_ind, ~]= setxor(inds, support_ind);    
+    
+    num_freeDOF= length(free_ind);
+end
+
+variables (ExternalAccess = modify)
+    w=    {0, 'rad/s'};
+    wDer= {0, 'rad/s^2'};
+    phi=  {0, 'rad'};
+end
+variables (ExternalAccess = observe)
+    % Locally scaled nominal values
+    eta=    {value= {zeros(num_DOF,1), '1'}, nominal = {eta_nominal_value,'1'}};
+    etaDer= {value= {zeros(num_DOF,1), '1/s'}, nominal = {etaDer_nominal_value,'1/s'}};
+
+    F_support= {zeros(num_DOF, 1), '1/s^2'};
+end
+
+intermediates
+    forcing_time_dep_coeff= ...
+        [w^2    *  cos(phi)
+         w^2    *  sin(phi)
+        wDer    *  cos(phi)
+        wDer    *  sin(phi)];
+
+    F_unbalance= ForceMagnitude * forcing_time_dep_coeff;
+end
+
+equations
+    w       == B.w;
+    w       == F.w;
+    w.der   == wDer;
+    phi.der == w;
+
+    eta.der == etaDer;
+    % Normalized equation of motion
+    % Each term has units of [1/s^2]
+    % F_unbalance, K, wDer [1/s^2]
+    % etaDer, alpha [1/s]
+    % eta, M, G [1]
+    % beta [s]
+    M * etaDer.der + (G*w + alpha*M + beta*K )*etaDer + (K + G*wDer )*eta == F_unbalance + normM*F_support;
+end
+if num_freeDOF > 0
+    equations
+        F_support(free_ind)  == {zeros(num_freeDOF, 1), '1/s^2'};
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Support B
+nodes (ExternalAccess = none)
+    Bx= foundation.mechanical.translational.translational;  % Bx
+    By= foundation.mechanical.translational.translational;  % By
+    Bt= foundation.mechanical.rotational.rotational;        % Bt
+    Bp= foundation.mechanical.rotational.rotational;        % Bp
+end
+% 
+variables
+    Bfx = { 0, 'N' };   % ForceBx
+    Bfy = { 0, 'N' };   % ForceBy
+    BTx = { 0, 'N*m' }; % TorqueBx
+    BTy = { 0, 'N*m' }; % TorqueBy
+end
+branches
+    Bfx : Bx.f -> *
+    Bfy : By.f -> *
+    BTx : Bt.t -> *
+    BTy : Bp.t -> *
+end
+equations
+    % Relate node force to main EOM
+    F_support(4*support_node(1)-3) == Bfx / {1, 's^2*N'}
+    F_support(4*support_node(1)-2) == Bfy / {1, 's^2*N'}
+    F_support(4*support_node(1)-1) == BTx / {1, 's^2*N*m'}
+    F_support(4*support_node(1)  ) == BTy / {1, 's^2*N*m'}
+ 
+    % Relate node velocities to etaDer
+    Bx.v == etaDer(4*support_node(1)-3) * {1, 'm'}
+    By.v == etaDer(4*support_node(1)-2) * {1, 'm'}
+    Bt.w == etaDer(4*support_node(1)-1) * {1, 'rad'}
+    Bp.w == etaDer(4*support_node(1)  ) * {1, 'rad'}
+end
+
+components (ExternalAccess= observe)
+    support_B =  WindTurbineDrivelineWithVibrationsBearingCB(...
+        bearing_speed= bearing_speed,...
+        K= K_supportB1,...
+        D= D_supportB1,...
+        Krot= Krot_supportB1,...
+        Drot= Drot_supportB1,...
+        beta= beta);
+end
+equations
+    support_B.shaft_w == w;
+end
+connections
+    connect(Bx, support_B.x)
+    connect(By, support_B.y)
+    connect(Bt, support_B.theta)
+    connect(Bp, support_B.phi)
+end
+
+% Output
+equations
+    Fsupports(1) == -Bfx;  Fsupports(2) == -Bfy;
+    Msupports(1) == -BTx;  Msupports(2) == -BTy;
+    Vsupports(1) ==  Bx.v; Vsupports(2) == By.v;
+    Wsupports(1) ==  Bt.w; Wsupports(2) == Bp.w;
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Support F
+if num_supports > 1
+    % Interface for support F
+    nodes (ExternalAccess = none)
+        Fx= foundation.mechanical.translational.translational;  % Fx
+        Fy= foundation.mechanical.translational.translational;  % Fy
+        Ft= foundation.mechanical.rotational.rotational;        % Ft
+        Fp= foundation.mechanical.rotational.rotational;        % Fp
+    end
+
+    variables
+        Ffx = { 0, 'N' };   % ForceFx
+        Ffy = { 0, 'N' };   % ForceFy
+        FTx = { 0, 'N*m' }; % TorqueFx
+        FTy = { 0, 'N*m' }; % TorqueFy
+    end
+    branches
+        Ffx : Fx.f -> *
+        Ffy : Fy.f -> *
+        FTx : Ft.t -> *
+        FTy : Fp.t -> *
+    end
+    equations
+        % Relate node force to main EOM
+        F_support(4*support_node(end)-3) == Ffx / {1, 's^2*N'}
+        F_support(4*support_node(end)-2) == Ffy / {1, 's^2*N'}
+        F_support(4*support_node(end)-1) == FTx / {1, 's^2*N*m'}
+        F_support(4*support_node(end)  ) == FTy / {1, 's^2*N*m'}
+
+        % Relate node velocities to etaDer
+        Fx.v == etaDer(4*support_node(end)-3) * {1, 'm'}
+        Fy.v == etaDer(4*support_node(end)-2) * {1, 'm'}
+        Ft.w == etaDer(4*support_node(end)-1) * {1, 'rad'}
+        Fp.w == etaDer(4*support_node(end)  ) * {1, 'rad'}
+    end
+
+    components (ExternalAccess= observe)
+        support_F =  WindTurbineDrivelineWithVibrationsBearingCB(...
+            bearing_speed= bearing_speed,...
+            K= K_supportF1,...
+            D= D_supportF1,...
+            Krot= Krot_supportF1,...
+            Drot= Drot_supportF1,...
+            beta= beta);
+    end
+    equations
+        support_F.shaft_w == w;
+    end
+    connections
+        connect(Fx, support_F.x)
+        connect(Fy, support_F.y)
+        connect(Ft, support_F.theta)
+        connect(Fp, support_F.phi)
+    end
+
+    % Output
+    equations
+        Fsupports(end-1) == -Ffx;  Fsupports(end) == -Ffy;
+        Msupports(end-1) == -FTx;  Msupports(end) == -FTy;
+        Vsupports(end-1) == Fx.v; Vsupports(end) == Fy.v;
+        Wsupports(end-1) == Ft.w; Wsupports(end) == Fp.w;
+    end
+end
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Support I1
+if num_supports > 2
+    nodes (ExternalAccess = none)
+        I1x= foundation.mechanical.translational.translational;  % I1x
+        I1y= foundation.mechanical.translational.translational;  % I1y
+        I1t= foundation.mechanical.rotational.rotational;        % I1t
+        I1p= foundation.mechanical.rotational.rotational;        % I1p
+    end
+    %
+    variables
+        I1fx = { 0, 'N' };   % ForceI1x
+        I1fy = { 0, 'N' };   % ForceI1y
+        I1Tx = { 0, 'N*m' }; % TorqueI1x
+        I1Ty = { 0, 'N*m' }; % TorqueI1y
+    end
+    branches
+        I1fx : I1x.f -> *
+        I1fy : I1y.f -> *
+        I1Tx : I1t.t -> *
+        I1Ty : I1p.t -> *
+    end
+    equations
+        % Relate node force to main EOM
+        F_support(4*support_node(2)-3) == I1fx / {1, 's^2*N'}
+        F_support(4*support_node(2)-2) == I1fy / {1, 's^2*N'}
+        F_support(4*support_node(2)-1) == I1Tx / {1, 's^2*N*m'}
+        F_support(4*support_node(2)  ) == I1Ty / {1, 's^2*N*m'}
+
+        % Relate node velocities to etaDer
+        I1x.v == etaDer(4*support_node(2)-3) * {1, 'm'}
+        I1y.v == etaDer(4*support_node(2)-2) * {1, 'm'}
+        I1t.w == etaDer(4*support_node(2)-1) * {1, 'rad'}
+        I1p.w == etaDer(4*support_node(2)  ) * {1, 'rad'}
+    end
+
+    components (ExternalAccess= observe)
+        support_I1 =  WindTurbineDrivelineWithVibrationsBearingCB(...
+            bearing_speed= bearing_speed,...
+            K= K_supportI1,...
+            D= D_supportI1,...
+            Krot= Krot_supportI1,...
+            Drot= Drot_supportI1,...
+            beta= beta);
+    end
+    equations
+        support_I1.shaft_w == w;
+    end
+    connections
+        connect(I1x, support_I1.x)
+        connect(I1y, support_I1.y)
+        connect(I1t, support_I1.theta)
+        connect(I1p, support_I1.phi)
+    end
+
+    % Output
+    equations
+        Fsupports(3) == -I1fx;   Fsupports(4) == -I1fy;
+        Msupports(3) == -I1Tx;   Msupports(4) == -I1Ty;
+        Vsupports(3) == I1x.v;  Vsupports(4) == I1y.v;
+        Wsupports(3) == I1t.w;  Wsupports(4) == I1p.w;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Support I2
+if num_supports > 3
+    nodes (ExternalAccess = none)
+        I2x= foundation.mechanical.translational.translational;  % I2x
+        I2y= foundation.mechanical.translational.translational;  % I2y
+        I2t= foundation.mechanical.rotational.rotational;        % I2t
+        I2p= foundation.mechanical.rotational.rotational;        % I2p
+    end
+    %
+    variables
+        I2fx = { 0, 'N' };   % ForceI2x
+        I2fy = { 0, 'N' };   % ForceI2y
+        I2Tx = { 0, 'N*m' }; % TorqueI2x
+        I2Ty = { 0, 'N*m' }; % TorqueI2y
+    end
+    branches
+        I2fx : I2x.f -> *
+        I2fy : I2y.f -> *
+        I2Tx : I2t.t -> *
+        I2Ty : I2p.t -> *
+    end
+    equations
+        % Relate node force to main EOM
+        F_support(4*support_node(3)-3) == I2fx / {1, 's^2*N'}
+        F_support(4*support_node(3)-2) == I2fy / {1, 's^2*N'}
+        F_support(4*support_node(3)-1) == I2Tx / {1, 's^2*N*m'}
+        F_support(4*support_node(3)  ) == I2Ty / {1, 's^2*N*m'}
+
+        % Relate node velocities to etaDer
+        I2x.v == etaDer(4*support_node(3)-3) * {1, 'm'}
+        I2y.v == etaDer(4*support_node(3)-2) * {1, 'm'}
+        I2t.w == etaDer(4*support_node(3)-1) * {1, 'rad'}
+        I2p.w == etaDer(4*support_node(3)  ) * {1, 'rad'}
+    end
+
+    components (ExternalAccess= observe)
+        support_I2 =  WindTurbineDrivelineWithVibrationsBearingCB(...
+            bearing_speed= bearing_speed,...
+            K= K_supportI2,...
+            D= D_supportI2,...
+            Krot= Krot_supportI2,...
+            Drot= Drot_supportI2,...
+            beta= beta);
+    end
+    equations
+        support_I2.shaft_w == w;
+    end
+    connections
+        connect(I2x, support_I2.x)
+        connect(I2y, support_I2.y)
+        connect(I2t, support_I2.theta)
+        connect(I2p, support_I2.phi)
+    end
+
+    % Output
+    equations
+        Fsupports(5) == -I2fx;   Fsupports(6) == -I2fy;
+        Msupports(5) == -I2Tx;   Msupports(6) == -I2Ty;
+        Vsupports(5) == I2x.v;   Vsupports(6) == I2y.v;
+        Wsupports(5) == I2t.w;   Wsupports(6) == I2p.w;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Support I3
+if num_supports > 4
+    nodes (ExternalAccess = none)
+        I3x= foundation.mechanical.translational.translational;  % I3x
+        I3y= foundation.mechanical.translational.translational;  % I3y
+        I3t= foundation.mechanical.rotational.rotational;        % I3t
+        I3p= foundation.mechanical.rotational.rotational;        % I3p
+    end
+    %
+    variables
+        I3fx = { 0, 'N' };   % ForceI3x
+        I3fy = { 0, 'N' };   % ForceI3y
+        I3Tx = { 0, 'N*m' }; % TorqueI3x
+        I3Ty = { 0, 'N*m' }; % TorqueI3y
+    end
+    branches
+        I3fx : I3x.f -> *
+        I3fy : I3y.f -> *
+        I3Tx : I3t.t -> *
+        I3Ty : I3p.t -> *
+    end
+    equations
+        % Relate node force to main EOM
+        F_support(4*support_node(4)-3) == I3fx / {1, 's^2*N'}
+        F_support(4*support_node(4)-2) == I3fy / {1, 's^2*N'}
+        F_support(4*support_node(4)-1) == I3Tx / {1, 's^2*N*m'}
+        F_support(4*support_node(4)  ) == I3Ty / {1, 's^2*N*m'}
+
+        % Relate node velocities to etaDer
+        I3x.v == etaDer(4*support_node(4)-3) * {1, 'm'}
+        I3y.v == etaDer(4*support_node(4)-2) * {1, 'm'}
+        I3t.w == etaDer(4*support_node(4)-1) * {1, 'rad'}
+        I3p.w == etaDer(4*support_node(4)  ) * {1, 'rad'}
+    end
+
+    components (ExternalAccess= observe)
+        support_I3 =  WindTurbineDrivelineWithVibrationsBearingCB(...
+            bearing_speed= bearing_speed,...
+            K= K_supportI3,...
+            D= D_supportI3,...
+            Krot= Krot_supportI3,...
+            Drot= Drot_supportI3,...
+            beta= beta);
+    end
+    equations
+        support_I3.shaft_w == w;
+    end
+    connections
+        connect(I3x, support_I3.x)
+        connect(I3y, support_I3.y)
+        connect(I3t, support_I3.theta)
+        connect(I3p, support_I3.phi)
+    end
+
+    % Output
+    equations
+        Fsupports(7) == -I3fx;   Fsupports(7) == -I3fy;
+        Msupports(7) == -I3Tx;   Msupports(7) == -I3Ty;
+        Vsupports(7) == I3x.v;   Vsupports(7) == I3y.v;
+        Wsupports(7) == I3t.w;   Wsupports(7) == I3p.w;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+outputs (ExternalAccess=observe)
+    % Physical signal outputs for transverse dynamics
+    % Format: [B1X B1Y I1X I1Y I2X I2Y F1X F1Y] support nodes
+    % F and M are the loads acting on the bearings
+    Fsupports=  {zeros(1,2*num_supports), 'N'};     % Fr:right
+    Msupports=  {zeros(1,2*num_supports), 'N*m'};   % M:right
+    Vsupports=  {zeros(1,2*num_supports), 'm/s'};   % V:right
+    Wsupports=  {zeros(1,2*num_supports), 'rad/s'}; % W:right
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+end

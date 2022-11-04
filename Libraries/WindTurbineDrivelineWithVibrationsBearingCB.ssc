@@ -1,0 +1,81 @@
+    component WindTurbineDrivelineWithVibrationsBearingCB
+% Bearing
+% 
+% Models transverse bearing dynamics for supporting the Craig-Bampton Flexible Shaft.
+
+% Copyright 2022 The MathWorks, Inc.
+
+nodes
+    x = foundation.mechanical.translational.translational;  % x:left
+    y = foundation.mechanical.translational.translational;  % y:left
+    theta = foundation.mechanical.rotational.rotational;    % theta:left
+    phi = foundation.mechanical.rotational.rotational;      % phi:left
+end
+
+inputs
+    shaft_w= {0, 'rad/s'}; %wShaft
+end
+
+parameters
+    bearing_speed= {[5 10 15], 'rad/s'};;
+    K   = {ones(3,4), 'N/m'}       % [Kxx Kxy Kyx Kyy]
+    D   = {ones(3,4), 'N*s/m'}     % [Dxx Dxy Dyx Dyy]
+    Krot= {ones(1,2), 'N*m/rad'}   % [Ktt Kpp]
+    Drot= {ones(1,2), 'N*m*s/rad'} % [Dtt Dpp]
+    beta= {.001, 's'};
+end
+
+% Derived
+parameters (Access = private, ExternalAccess = none)
+    num_bkpts= length( bearing_speed );
+    ind_bkpts= 1:num_bkpts;
+ 
+    bearing_speed_diff= diff(bearing_speed);
+    bearing_speed_diff_matrix= repmat(bearing_speed_diff(:), 1, 4);
+    K_slope= [diff(K, 1)./bearing_speed_diff_matrix; {zeros(1,4), 'N/m/(rad/s)'}];
+    D_slope= [diff(D, 1)./bearing_speed_diff_matrix; {zeros(1,4), 'N*s/m/(rad/s)'}];
+end
+
+variables
+    xDef = { value = { 0, 'm'}, priority = priority.high };    % Deformation x
+    yDef = { value = { 0, 'm'}, priority = priority.high };    % Deformation y
+    tDef = { value = { 0, 'rad'}, priority = priority.high };  % Deformation theta
+    pDef = { value = { 0, 'rad'}, priority = priority.high };  % Deformation phi
+
+    fx = { 0, 'N' };   % Force x
+    fy = { 0, 'N' };   % Force y
+    Tx = { 0, 'N*m' }; % Torque x
+    Ty = { 0, 'N*m' }; % Torque y
+end
+
+branches
+    fx : x.f -> *
+    fy : y.f -> *
+    Tx : theta.t -> *
+    Ty : phi.t -> *
+end
+
+ intermediates (ExternalAccess= observe)  
+     i= tablelookup( bearing_speed, ind_bkpts, abs(shaft_w), interpolation=linear, extrapolation=nearest);
+     iFirst= floor(i);
+     deltaOmega= max( shaft_w - bearing_speed( iFirst ), 0 );
+
+     D_=  D(iFirst,:) + D_slope(iFirst,:).* deltaOmega;
+     K_=  K(iFirst,:) + K_slope(iFirst,:).* deltaOmega;
+ end
+
+equations
+    xDef.der == x.v;
+    yDef.der == y.v;
+    tDef.der == theta.w;
+    pDef.der == phi.w;
+
+    fx == K_(1:2) * [xDef yDef]' +  (beta*K_(1:2) + D_(1:2)) * [x.v y.v]'
+    fy == K_(3:4) * [xDef yDef]' +  (beta*K_(3:4) + D_(3:4)) * [x.v y.v]'
+    Tx == Krot(1) * tDef + Drot(1) * theta.w
+    Ty == Krot(2) * pDef + Drot(2) * phi.w
+end
+
+
+
+end
