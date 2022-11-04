@@ -1,6 +1,6 @@
 # Wind Turbine Driveline with Vibrations in Simscape&trade;
 
-[![View Wind Turbine Driveline with Vibrations on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/###-wind-turbine-driveline-vibrations-simscape)
+[![View Wind Turbine Driveline with Vibrations on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/120033-wind-turbine-driveline-with-vibrations-in-simscape)
 
 Version 1.0 for MATLAB&reg; R2022b or newer
 
@@ -35,7 +35,7 @@ This version requires
 To download the released version without Git repository data,
 use the link below.
 
-- https://github.com/mathworks/wind-turbine-driveline-vibrations-simscape/archive/refs/tags/v1.0.0.zip
+- https://github.com/mathworks/Wind-Turbine-Driveline-Vibrations-Simscape/archive/refs/tags/22.2.1.5.zip
 
 
 ## How to Use
