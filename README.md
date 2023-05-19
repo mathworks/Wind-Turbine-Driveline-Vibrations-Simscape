@@ -2,7 +2,7 @@
 
 [![View Wind Turbine Driveline with Vibrations on File Exchange](https://www.mathworks.com/matlabcentral/images/matlab-file-exchange.svg)](https://www.mathworks.com/matlabcentral/fileexchange/120033-wind-turbine-driveline-with-vibrations-in-simscape)
 
-Version 1.0 for MATLAB&reg; R2022b or newer
+Version 2.0 for MATLAB&reg; R2023a or newer
 
 ## Introduction
 
@@ -22,6 +22,12 @@ can be modeled using a lumped mass finite element method or a reduced order
 model to simulate the shaft vibrations efficiently. The reduced order model 
 can be a traditional static eigenmodes method, a speed-dependent eigenmodes 
 method, or a Craig-Bampton method. 
+
+## For MATLAB R2023a
+
+Versoin 2.0 is available.
+
+All model files have been saved in R2023a.
 
 ## For MATLAB R2022b
 
