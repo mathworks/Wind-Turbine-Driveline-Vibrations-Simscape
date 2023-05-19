@@ -119,19 +119,6 @@ rotor.Ip_rotor_hub= 8.6e6+6.2e7;        % Polar moment of inertia of rotor+hub [
 fs.Ip= [rotor.Ip_rotor_hub 7.4e6];      % Polar moment of inertia of rotor+hub and generator [kg*m^2]
 fs.Ip_total= fs.shaft_inertia + sum(fs.Ip); % Total polar moment of inertis of shaft, rotor+hub and generator [kg*m^2]
 
-%% Solver parameters
-% Ensure scaled key states are larger than solver absolute tolerance.
-solver.defaultNominalValues= '{"value":"1","unit":"m/s"}, {"value":"1","unit":"MW"},{"value":"10","unit":"kN"}, {"value":"1","unit":"cm^2"},{"value":"1","unit":"kJ/kg"},{"value":"1","unit":"kN*m"},{"value":"1","unit":"V"}';
-solver.SimscapeNominalValues.rigid=         ['[{"value":"1","unit":"1/s"},   {"value":"1","unit":"1"}, '       solver.defaultNominalValues ']'];
-solver.SimscapeNominalValues.lumped_mass=   ['[{"value":"1e-4","unit":"1/s"},{"value":"5e-7", "unit":"1"}, ' solver.defaultNominalValues ']'];
-solver.SimscapeNominalValues.static_eig=    ['[{"value":"1e-4","unit":"1/s"},{"value":"5e-7","unit":"1"}, ' solver.defaultNominalValues ']'];
-solver.SimscapeNominalValues.speed_dep_eig= solver.SimscapeNominalValues.static_eig;
-% Craig-Bampton Flexible shaft has nominal value scaling set locally in the block:
-solver.SimscapeNominalValues.CB=            [ '[' solver.defaultNominalValues ']' ];
-solver.SimscapeNominalValues.fsCB.mode_displacements= 5e-7; % [1]
-SimscapeNominalValues.fsCB.mode_velocities=           1e-4; % [1/s]
-
-
 %% Rotor Aerodynamic properties
 rotor.R= 198/2;   % Radius [m]
 rotor.rho= 1.225; % [kg/m^3]
